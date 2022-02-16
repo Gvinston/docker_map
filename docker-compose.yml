@@ -1,0 +1,75 @@
+# Версия docker-compose
+version: '3'
+# Список наших сервисов (контейнеров)
+services:
+  nginx:
+    # используем последний стабильный образ nginx
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    tty: true
+    # маршрутизируем порты
+    ports:
+      - "80:80"
+      - "443:443"
+    # монтируем директории, слева директории на основной машине, справа - куда они монтируются в контейнере
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+      - ../:/var/www
+      - ./logs:/var/log/nginx
+    # nginx должен общаться с php контейнером
+    depends_on:
+      - php7.4-fpm
+    networks:
+      - app-network
+
+  php7.4-fpm:
+    # у нас свой образ для PHP, указываем путь к нему и говорим что его надо собрать
+    build: ./php7.4-fpm
+    container_name: php7.4-fpm
+    restart: unless-stopped
+    tty: true
+    environment:
+      SERVICE_NAME: php7.4-fpm
+      SERVICE_TAGS: dev
+    # этот образ будет общаться с mysql
+    depends_on:
+      - db
+    # монтируем директорию с проектами
+    volumes:
+      - ../:/var/www
+      - ./logs:/var/log/php
+    networks:
+      - app-network
+  db:
+    #image: mysql:8
+    image: mysql:8
+    container_name: db
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./mysql/dbdata-demo:/var/lib/mysql
+      - ./mysql/error.log:/var/log/mysql/error.log
+      - ./mysql/mysql-files:/var/lib/mysql-files
+      - ./mysql/dumps:/var/lib/mysql-dumps
+      - ./mysql/mysql.cnf:/etc/mysql/my.cnf
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_ROOT_PASSWORD: secret
+      SERVICE_TAGS: dev
+      SERVICE_NAME: mysql
+    networks:
+      - app-network
+
+#Volumes
+volumes:
+  dbdata:
+    driver: local
+
+#Docker Networks
+networks:
+  app-network:
+    driver: bridge
+
